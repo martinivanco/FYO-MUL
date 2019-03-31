@@ -3,6 +3,10 @@ import imgproc
 import wx
 import wx.lib.scrolledpanel as scroll
 import pubsub.pub as pub
+import matplotlib as mpl
+import matplotlib.backends.backend_wxagg as wxagg
+from matplotlib.figure import Figure
+import numpy as np
 
 class SettingSlider(wx.Panel):
     def __init__(self, parent, setting, image_processor):
@@ -31,6 +35,11 @@ class SettingsPanel(scroll.ScrolledPanel):
         super().__init__(parent)
         self.panel_sizer = wx.BoxSizer(wx.VERTICAL)
 
+        self.figure = Figure()
+        self.figure.subplots_adjust(bottom=0.01, top=0.99, left=0.01, right=0.99)
+        self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
+        self.histogram.SetMinSize((1, 150))
+        self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
         self.exposure = SettingSlider(self, tools.S_EXPOSURE, image_processor)
         self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
         self.contrast = SettingSlider(self, tools.S_CONTRAST, image_processor)
@@ -40,6 +49,20 @@ class SettingsPanel(scroll.ScrolledPanel):
 
         self.SetSizer(self.panel_sizer)
         self.SetupScrolling()
+        pub.subscribe(self.onHistogram, "rendered")
+
+    def onHistogram(self, render, hist_data):
+        self.figure.clf()
+        tmp = self.figure.add_subplot(111)
+        tmp.axis('off')
+        tmp.set_xmargin(0)
+        tmp.set_ymargin(0)
+        x = np.arange(0, 256, 1)
+        tmp.fill_between(x, 0, hist_data[0][:,0], facecolor='#2196f3')
+        tmp.fill_between(x, 0, hist_data[1][:,0], facecolor='#4caf50')
+        tmp.fill_between(x, 0, hist_data[2][:,0], facecolor='#f44336')
+        tmp.fill_between(x, 0, hist_data[3][:,0], facecolor='#9e9e9e')
+        self.histogram.draw()
 
 class ImagePanel(wx.Panel):
     def __init__(self, parent, image_processor):
@@ -52,33 +75,27 @@ class ImagePanel(wx.Panel):
         self.widget.SetPosition((10, 10))
         self.Bind(wx.EVT_SIZE, self.onResize)
         pub.subscribe(self.onRender, "rendered")
+        pub.subscribe(self.onScale, "scaled")
 
     def loadImage(self, path):
         self.image = wx.Bitmap(path).ConvertToImage()
         self.img_w = self.image.GetWidth()
         self.img_h = self.image.GetHeight()
-        self.onResize(None)
         self.image_processor.loadImage(path)
+        imgproc.Render(self.image_processor)
 
     def onResize(self, event):
-        # TODO DO THIS IN ANOTHER THREAD
         if self.image.IsOk():
-            w_scale = (self.GetSize().GetWidth() - 20) / self.img_w
-            h_scale = (self.GetSize().GetHeight() - 20) / self.img_h
-            if w_scale < h_scale:
-                scaled_img = self.image.Scale(self.img_w * w_scale, self.img_h * w_scale, wx.IMAGE_QUALITY_NEAREST)
-                h_pos = (self.GetSize().GetHeight() - 20 - self.img_h * w_scale) / 2 + 10
-                self.widget.SetPosition((10, h_pos))
-            else:
-                scaled_img = self.image.Scale(self.img_w * h_scale, self.img_h * h_scale, wx.IMAGE_QUALITY_NEAREST)
-                w_pos = (self.GetSize().GetWidth() - 20 - self.img_w * h_scale) / 2 + 10
-                self.widget.SetPosition((w_pos, 10))
-            self.widget.SetBitmap(wx.Bitmap(scaled_img))
+            imgproc.Scale((self.GetSize().GetWidth(), self.GetSize().GetHeight()), (self.img_w, self.img_h), self.image)
             
         if event is not None:
             event.Skip()
 
-    def onRender(self, render):
+    def onScale(self, position, scaled_image):
+        self.widget.SetPosition(position)
+        self.widget.SetBitmap(wx.Bitmap(scaled_image))
+
+    def onRender(self, render, hist_data):
         self.image = render
         self.onResize(None)
 
