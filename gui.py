@@ -24,12 +24,18 @@ class SettingSlider(wx.Panel):
         self.panel_sizer.Add(self.value, 0)
 
         self.slider.Bind(wx.EVT_SCROLL, self.onScroll)
+        self.slider.Bind(wx.EVT_SCROLL_THUMBRELEASE, self.onRelease)
         self.SetSizer(self.panel_sizer)
 
     def onScroll(self, event):
         self.value.SetLabel(str(self.slider.GetValue() * self.factor)[:4 if self.slider.GetValue() < 0 else 3])
         self.image_processor.change(self.setting, self.slider.GetValue() * self.factor)
         imgproc.Render(self.image_processor)
+        event.Skip()
+
+    def onRelease(self, event):
+        imgproc.Render(self.image_processor, True)
+        event.Skip()
 
 class SettingsPanel(scroll.ScrolledPanel):
     def __init__(self, parent, image_processor):
@@ -57,6 +63,9 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.panel_sizer.Add(self.sharpening_radius, 0, wx.ALL | wx.EXPAND, 5)
         self.sharpening_masking = SettingSlider(self, tools.S_SHARPENING_MASKING, image_processor, 0)
         self.panel_sizer.Add(self.sharpening_masking, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.denoising = SettingSlider(self, tools.S_DENOISING, image_processor, 0)
+        self.panel_sizer.Add(self.denoising, 0, wx.ALL | wx.EXPAND, 5)
 
         self.SetSizer(self.panel_sizer)
         self.SetupScrolling()

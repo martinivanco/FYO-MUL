@@ -12,6 +12,8 @@ S_VIBRANCE = 1024
 S_SHARPENING_AMOUNT = 2048
 S_SHARPENING_RADIUS = 4096
 S_SHARPENING_MASKING = 8192
+S_DENOISING = 16384
+# 32768
 
 def get_setting_name(setting):
     if setting & S_EXPOSURE:
@@ -30,4 +32,6 @@ def get_setting_name(setting):
         return "Radius"
     if setting & S_SHARPENING_MASKING:
         return "Masking"
+    if setting & S_DENOISING:
+        return "Denoise"
     return "Unknown"

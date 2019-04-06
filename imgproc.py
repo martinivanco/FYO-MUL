@@ -30,7 +30,7 @@ class Scale(threading.Thread):
         pub.sendMessage("scaled", position = position, scaled_image = scaled_img)
 
 class Render(threading.Thread):
-    def __init__(self, image_processor):
+    def __init__(self, image_processor, full_render = False):
         super(Render, self).__init__()
         self.image = image_processor.image
         self.exposure = image_processor.exposure
@@ -39,11 +39,13 @@ class Render(threading.Thread):
         self.sharpening_amount = image_processor.sharpening_amount
         self.sharpening_radius = image_processor.sharpening_radius
         self.sharpening_masking = image_processor.sharpening_masking
+        self.denoising = image_processor.denoising
+        self.full_render = full_render
         self.start()
 
     def run(self):
         hsv = np.int16(cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL))
-        
+
         if self.exposure != 0:
             hsv[:,:,2] += self.exposure
 
@@ -67,6 +69,12 @@ class Render(threading.Thread):
             hsv[:,:,2] = hsv[:,:,2] + ((self.sharpening_amount / 50.0) * mask)
 
         hsv = np.clip(hsv, 0, 255)
+        if self.full_render and self.denoising > 0:
+            bgr = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
+            bgr = cv2.fastNlMeansDenoisingColored(bgr, h = self.denoising / 10.0, templateWindowSize = 5, searchWindowSize = 15)
+            hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV_FULL)
+        
+        # TODO correct histogram
         hist_exp = cv2.calcHist([np.uint8(hsv)],[2],None,[256],[0,256])
         final = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
         hist_b = cv2.calcHist([final],[0],None,[256],[0,256])
@@ -87,6 +95,7 @@ class ImageProcessor():
         self.sharpening_amount = 0
         self.sharpening_radius = 1.0
         self.sharpening_masking = 0
+        self.denoising = 0
 
     def loadImage(self, path):
         self.image = cv2.imread(path)
@@ -104,3 +113,5 @@ class ImageProcessor():
             self.sharpening_radius = value
         if setting & tools.S_SHARPENING_MASKING:
             self.sharpening_masking = value
+        if setting & tools.S_DENOISING:
+            self.denoising = value
