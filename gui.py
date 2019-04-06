@@ -9,25 +9,26 @@ from matplotlib.figure import Figure
 import numpy as np
 
 class SettingSlider(wx.Panel):
-    def __init__(self, parent, setting, image_processor):
+    def __init__(self, parent, setting, image_processor, lower_bound = -100, higher_bound = 100, default = 0, factor = 1):
         super().__init__(parent)
         self.setting = setting
         self.image_processor = image_processor
         self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.factor = factor
     
-        self.label = wx.StaticText(self, label = tools.get_setting_name(self.setting), size = (70, 15))
+        self.label = wx.StaticText(self, label = tools.get_setting_name(self.setting), size = (70, 18))
         self.panel_sizer.Add(self.label, 0)
-        self.slider = wx.Slider(self, value = 0, minValue = -100, maxValue = 100)
+        self.slider = wx.Slider(self, value = default, minValue = lower_bound, maxValue = higher_bound)
         self.panel_sizer.Add(self.slider, 1, wx.LEFT | wx.RIGHT | wx.EXPAND, 5)
-        self.value = wx.StaticText(self, label = "0", size = (30, 15))
+        self.value = wx.StaticText(self, label = str(default * self.factor)[:3], size = (30, 15))
         self.panel_sizer.Add(self.value, 0)
 
         self.slider.Bind(wx.EVT_SCROLL, self.onScroll)
         self.SetSizer(self.panel_sizer)
 
     def onScroll(self, event):
-        self.value.SetLabel(str(self.slider.GetValue()))
-        self.image_processor.change(self.setting, self.slider.GetValue())
+        self.value.SetLabel(str(self.slider.GetValue() * self.factor)[:4 if self.slider.GetValue() < 0 else 3])
+        self.image_processor.change(self.setting, self.slider.GetValue() * self.factor)
         imgproc.Render(self.image_processor)
 
 class SettingsPanel(scroll.ScrolledPanel):
@@ -40,12 +41,22 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
         self.histogram.SetMinSize((1, 150))
         self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
+
         self.exposure = SettingSlider(self, tools.S_EXPOSURE, image_processor)
         self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
         self.contrast = SettingSlider(self, tools.S_CONTRAST, image_processor)
         self.panel_sizer.Add(self.contrast, 0, wx.ALL | wx.EXPAND, 5)
         self.saturation = SettingSlider(self, tools.S_SATURATION, image_processor)
         self.panel_sizer.Add(self.saturation, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.label_sharpening = wx.StaticText(self, label = "Sharpening")
+        self.panel_sizer.Add(self.label_sharpening, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpening_amount = SettingSlider(self, tools.S_SHARPENING_AMOUNT, image_processor, 0, 150)
+        self.panel_sizer.Add(self.sharpening_amount, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpening_radius = SettingSlider(self, tools.S_SHARPENING_RADIUS, image_processor, 5, 30, 10, 0.1)
+        self.panel_sizer.Add(self.sharpening_radius, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpening_masking = SettingSlider(self, tools.S_SHARPENING_MASKING, image_processor, 0)
+        self.panel_sizer.Add(self.sharpening_masking, 0, wx.ALL | wx.EXPAND, 5)
 
         self.SetSizer(self.panel_sizer)
         self.SetupScrolling()

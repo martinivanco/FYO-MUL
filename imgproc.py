@@ -36,12 +36,17 @@ class Render(threading.Thread):
         self.exposure = image_processor.exposure
         self.contrast = image_processor.contrast
         self.saturation = image_processor.saturation
+        self.sharpening_amount = image_processor.sharpening_amount
+        self.sharpening_radius = image_processor.sharpening_radius
+        self.sharpening_masking = image_processor.sharpening_masking
         self.start()
 
     def run(self):
         hsv = np.int16(cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV_FULL))
+        
         if self.exposure != 0:
             hsv[:,:,2] += self.exposure
+
         if self.contrast != 0:
             old_mean = cv2.mean(hsv[:,:,2])[0]
             if self.contrast < 0:
@@ -55,6 +60,12 @@ class Render(threading.Thread):
         
         if self.saturation != 0:
             hsv[:,:,1] += self.saturation
+        
+        if self.sharpening_amount > 0:
+            mask = hsv[:,:,2] - cv2.GaussianBlur(hsv[:,:,2], (0, 0), self.sharpening_radius)
+            mask[mask < self.sharpening_masking] = 0
+            hsv[:,:,2] = hsv[:,:,2] + ((self.sharpening_amount / 50.0) * mask)
+
         hsv = np.clip(hsv, 0, 255)
         hist_exp = cv2.calcHist([np.uint8(hsv)],[2],None,[256],[0,256])
         final = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
@@ -73,6 +84,9 @@ class ImageProcessor():
         self.exposure = 0
         self.contrast = 0
         self.saturation = 0
+        self.sharpening_amount = 0
+        self.sharpening_radius = 1.0
+        self.sharpening_masking = 0
 
     def loadImage(self, path):
         self.image = cv2.imread(path)
@@ -84,3 +98,9 @@ class ImageProcessor():
             self.contrast = value
         if setting & tools.S_SATURATION:
             self.saturation = value
+        if setting & tools.S_SHARPENING_AMOUNT:
+            self.sharpening_amount = value
+        if setting & tools.S_SHARPENING_RADIUS:
+            self.sharpening_radius = value
+        if setting & tools.S_SHARPENING_MASKING:
+            self.sharpening_masking = value
