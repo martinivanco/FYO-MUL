@@ -33,13 +33,18 @@ class Render(threading.Thread):
     def __init__(self, image_processor, full_render = False):
         super(Render, self).__init__()
         self.image = image_processor.image
+        self.gauss2d = image_processor.gauss2d
+        self.distortion_coeffs = image_processor.distortion_coeffs
+        self.camera = image_processor.camera
         self.exposure = image_processor.exposure
         self.contrast = image_processor.contrast
         self.saturation = image_processor.saturation
-        self.sharpening_amount = image_processor.sharpening_amount
-        self.sharpening_radius = image_processor.sharpening_radius
-        self.sharpening_masking = image_processor.sharpening_masking
-        self.denoising = image_processor.denoising
+        self.sharpen_amount = image_processor.sharpen_amount
+        self.sharpen_radius = image_processor.sharpen_radius
+        self.sharpen_masking = image_processor.sharpen_masking
+        self.denoise = image_processor.denoise
+        self.vignette = image_processor.vignette
+        self.distort = image_processor.distort
         self.full_render = full_render
         self.start()
 
@@ -63,18 +68,32 @@ class Render(threading.Thread):
         if self.saturation != 0:
             hsv[:,:,1] += self.saturation
         
-        if self.sharpening_amount > 0:
-            mask = hsv[:,:,2] - cv2.GaussianBlur(hsv[:,:,2], (0, 0), self.sharpening_radius)
-            mask[mask < self.sharpening_masking] = 0
-            hsv[:,:,2] = hsv[:,:,2] + ((self.sharpening_amount / 50.0) * mask)
+        if self.sharpen_amount > 0:
+            mask = hsv[:,:,2] - cv2.GaussianBlur(hsv[:,:,2], (0, 0), self.sharpen_radius)
+            mask[mask < self.sharpen_masking] = 0
+            hsv[:,:,2] = hsv[:,:,2] + ((self.sharpen_amount / 50.0) * mask)
 
-        hsv = np.clip(hsv, 0, 255)
-        if self.full_render and self.denoising > 0:
+        if self.full_render and self.denoise > 0:
+            hsv = np.clip(hsv, 0, 255)
             bgr = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
-            bgr = cv2.fastNlMeansDenoisingColored(bgr, h = self.denoising / 10.0, templateWindowSize = 5, searchWindowSize = 15)
+            bgr = cv2.fastNlMeansDenoisingColored(bgr, h = self.denoise / 10.0, templateWindowSize = 5, searchWindowSize = 15)
             hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV_FULL)
+
+        if self.vignette != 0:
+            hsv[:,:,2] = hsv[:,:,2] + np.int16(self.gauss2d * self.vignette)
         
+        if self.distort != 0:
+            self.distortion_coeffs[0,0] = self.distort * 2.0e-5
+            h, w, c = self.image.shape
+            matrix, roi = cv2.getOptimalNewCameraMatrix(self.camera, self.distortion_coeffs, (w,h), 1, (w,h))
+            bgr = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
+            bgr = cv2.undistort(bgr, self.camera, self.distortion_coeffs, None, matrix)
+            x, y, w, h = roi
+            bgr = bgr[y:y+h, x:x+w]
+            hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV_FULL)
+
         # TODO correct histogram
+        hsv = np.clip(hsv, 0, 255)
         hist_exp = cv2.calcHist([np.uint8(hsv)],[2],None,[256],[0,256])
         final = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
         hist_b = cv2.calcHist([final],[0],None,[256],[0,256])
@@ -89,16 +108,30 @@ class Render(threading.Thread):
 class ImageProcessor():
     def __init__(self):
         self.image = None
+        self.gauss2d = None
+        self.distortion_coeffs = np.zeros((4,1), np.float64)
+        self.camera = np.eye(3, dtype = np.float32)
+        self.camera[0,0] = 43.0
+        self.camera[1,1] = 43.0
         self.exposure = 0
         self.contrast = 0
         self.saturation = 0
-        self.sharpening_amount = 0
-        self.sharpening_radius = 1.0
-        self.sharpening_masking = 0
-        self.denoising = 0
+        self.sharpen_amount = 0
+        self.sharpen_radius = 1.0
+        self.sharpen_masking = 0
+        self.denoise = 0
+        self.vignette = 0
+        self.distort = 0
 
     def loadImage(self, path):
         self.image = cv2.imread(path)
+        height, width, channels = self.image.shape
+        g2d = cv2.getGaussianKernel(width, width / 2) * cv2.getGaussianKernel(height, height / 2).T
+        g2d = 1.0 / g2d
+        g2d -= g2d.min()
+        self.gauss2d = g2d / g2d.max()
+        self.camera[0,2] = width / 2.0
+        self.camera[1,2] = height / 2.0
 
     def change(self, setting, value):
         if setting & tools.S_EXPOSURE:
@@ -107,11 +140,15 @@ class ImageProcessor():
             self.contrast = value
         if setting & tools.S_SATURATION:
             self.saturation = value
-        if setting & tools.S_SHARPENING_AMOUNT:
-            self.sharpening_amount = value
-        if setting & tools.S_SHARPENING_RADIUS:
-            self.sharpening_radius = value
-        if setting & tools.S_SHARPENING_MASKING:
-            self.sharpening_masking = value
-        if setting & tools.S_DENOISING:
-            self.denoising = value
+        if setting & tools.S_SHARPEN_AMOUNT:
+            self.sharpen_amount = value
+        if setting & tools.S_SHARPEN_RADIUS:
+            self.sharpen_radius = value
+        if setting & tools.S_SHARPEN_MASKING:
+            self.sharpen_masking = value
+        if setting & tools.S_DENOISE:
+            self.denoise = value
+        if setting & tools.S_VIGNETTE:
+            self.vignette = value
+        if setting & tools.S_DISTORT:
+            self.distort = value

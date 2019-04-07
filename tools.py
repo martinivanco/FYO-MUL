@@ -9,11 +9,12 @@ S_WHITES = 128
 S_BLACKS = 256
 S_CLARITY = 512
 S_VIBRANCE = 1024
-S_SHARPENING_AMOUNT = 2048
-S_SHARPENING_RADIUS = 4096
-S_SHARPENING_MASKING = 8192
-S_DENOISING = 16384
-# 32768
+S_SHARPEN_AMOUNT = 2048
+S_SHARPEN_RADIUS = 4096
+S_SHARPEN_MASKING = 8192
+S_DENOISE = 16384
+S_VIGNETTE = 32768
+S_DISTORT = 65536
 
 def get_setting_name(setting):
     if setting & S_EXPOSURE:
@@ -26,12 +27,16 @@ def get_setting_name(setting):
         return "Temp"
     if setting & S_TINT:
         return "Tint"
-    if setting & S_SHARPENING_AMOUNT:
+    if setting & S_SHARPEN_AMOUNT:
         return "Amount"
-    if setting & S_SHARPENING_RADIUS:
+    if setting & S_SHARPEN_RADIUS:
         return "Radius"
-    if setting & S_SHARPENING_MASKING:
+    if setting & S_SHARPEN_MASKING:
         return "Masking"
-    if setting & S_DENOISING:
+    if setting & S_DENOISE:
         return "Denoise"
+    if setting & S_VIGNETTE:
+        return "Vignetting"
+    if setting & S_DISTORT:
+        return "Distortion"
     return "Unknown"
