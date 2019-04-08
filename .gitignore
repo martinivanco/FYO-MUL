@@ -1,4 +1,4 @@
 .DS_Store
 playground.py
-test.jpg
+test*.jpg
 __pycache__

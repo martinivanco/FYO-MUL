@@ -8,6 +8,34 @@ import matplotlib.backends.backend_wxagg as wxagg
 from matplotlib.figure import Figure
 import numpy as np
 
+class InfoPanel(wx.Panel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.panel_sizer.Add(wx.Panel(self), 1, wx.EXPAND)
+        self.red = wx.StaticText(self, label = "R:", size = (50, 20))
+        self.panel_sizer.Add(self.red, 0)
+        self.green = wx.StaticText(self, label = "G:", size = (50, 20))
+        self.panel_sizer.Add(self.green, 0)
+        self.blue = wx.StaticText(self, label = "B:", size = (50, 20))
+        self.panel_sizer.Add(self.blue, 0)
+        self.panel_sizer.Add(wx.Panel(self), 1, wx.EXPAND)
+
+        self.SetSizer(self.panel_sizer)
+        pub.subscribe(self.onMouseMove, "mouse_move")
+        pub.subscribe(self.onMouseLeave, "mouse_leave")
+
+    def onMouseMove(self, values):
+        self.red.SetLabelText("R: {}".format(values[0]))
+        self.green.SetLabelText("G: {}".format(values[1]))
+        self.blue.SetLabelText("B: {}".format(values[2]))
+
+    def onMouseLeave(self):
+        self.red.SetLabelText("R:")
+        self.green.SetLabelText("G:")
+        self.blue.SetLabelText("B:")
+
 class SettingSlider(wx.Panel):
     def __init__(self, parent, setting, image_processor, lower_bound = -100, higher_bound = 100, default = 0, factor = 1):
         super().__init__(parent)
@@ -47,6 +75,8 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
         self.histogram.SetMinSize((1, 150))
         self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
+        self.info_panel = InfoPanel(self)
+        self.panel_sizer.Add(self.info_panel, 0, wx.ALL | wx.EXPAND, 5)
 
         self.exposure = SettingSlider(self, tools.S_EXPOSURE, image_processor)
         self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
@@ -95,9 +125,12 @@ class ImagePanel(wx.Panel):
         self.image = wx.Image()
         self.img_w = 0
         self.img_h = 0
+        self.scaled_image = None
         self.widget = wx.StaticBitmap(self, -1, wx.Bitmap(width = 1, height = 1))
         self.widget.SetPosition((10, 10))
         self.Bind(wx.EVT_SIZE, self.onResize)
+        self.widget.Bind(wx.EVT_ENTER_WINDOW, self.onEnterWindow)
+        self.widget.Bind(wx.EVT_LEAVE_WINDOW, self.onLeaveWindow)
         pub.subscribe(self.onRender, "rendered")
         pub.subscribe(self.onScale, "scaled")
 
@@ -115,9 +148,26 @@ class ImagePanel(wx.Panel):
         if event is not None:
             event.Skip()
 
+    def onEnterWindow(self, event):
+        self.widget.Bind(wx.EVT_MOTION, self.onMouseMove)
+        event.Skip()
+
+    def onLeaveWindow(self, event):
+        self.widget.Unbind(wx.EVT_MOTION)
+        pub.sendMessage("mouse_leave")
+        event.Skip()
+
+    def onMouseMove(self, event):
+        if self.scaled_image is not None:
+            p = event.GetPosition()
+            v = (self.scaled_image.GetRed(p.x, p.y), self.scaled_image.GetGreen(p.x, p.y), self.scaled_image.GetBlue(p.x, p.y))
+            pub.sendMessage("mouse_move", values = v)
+        event.Skip()
+
     def onScale(self, position, scaled_image):
         self.widget.SetPosition(position)
         self.widget.SetBitmap(wx.Bitmap(scaled_image))
+        self.scaled_image = scaled_image
 
     def onRender(self, render, hist_data):
         self.image = render

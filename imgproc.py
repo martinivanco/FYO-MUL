@@ -92,13 +92,12 @@ class Render(threading.Thread):
             bgr = bgr[y:y+h, x:x+w]
             hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV_FULL)
 
-        # TODO correct histogram
         hsv = np.clip(hsv, 0, 255)
-        hist_exp = cv2.calcHist([np.uint8(hsv)],[2],None,[256],[0,256])
+        hist_exp = cv2.calcHist([np.uint8(hsv)], [2], None, [256], (0,256))
         final = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
-        hist_b = cv2.calcHist([final],[0],None,[256],[0,256])
-        hist_g = cv2.calcHist([final],[1],None,[256],[0,256])
-        hist_r = cv2.calcHist([final],[2],None,[256],[0,256])
+        hist_b = cv2.calcHist([final], [0], None, [256], (0,256))
+        hist_g = cv2.calcHist([final], [1], None, [256], (0,256))
+        hist_r = cv2.calcHist([final], [2], None, [256], (0,256))
         wx.CallAfter(self.sendResult, final, (hist_b, hist_g, hist_r, hist_exp))
 
     def sendResult(self, render, hist_data):
