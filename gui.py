@@ -135,11 +135,15 @@ class ImagePanel(wx.Panel):
         pub.subscribe(self.onScale, "scaled")
 
     def loadImage(self, path):
+        #TODO zero out setings
         self.image = wx.Bitmap(path).ConvertToImage()
         self.img_w = self.image.GetWidth()
         self.img_h = self.image.GetHeight()
         self.image_processor.loadImage(path)
         imgproc.Render(self.image_processor)
+
+    def saveImage(self, path):
+        self.image.SaveFile(path)
 
     def onResize(self, event):
         if self.image.IsOk():
@@ -184,8 +188,37 @@ class MainFrame(wx.Frame):
         self.settings_panel = SettingsPanel(self.main_panel, image_processor)
         self.panel_sizer.Add(self.settings_panel, 1, wx.ALL | wx.EXPAND, 0)
 
+        self.menu_bar = wx.MenuBar()
+        file_menu = wx.Menu()
+        item_open = file_menu.Append(wx.ID_OPEN, 'Open', 'Open an image')
+        self.Bind(wx.EVT_MENU, self.onOpen, item_open)
+        item_save = file_menu.Append(wx.ID_SAVE, 'Save', 'Save the image')
+        self.Bind(wx.EVT_MENU, self.onSave, item_save)
+        self.menu_bar.Append(file_menu, '&File')
+        
+        self.SetMenuBar(self.menu_bar)
         self.main_panel.SetSizer(self.panel_sizer)
         self.SetSize((900, 600))
         self.SetMinSize((900, 600))
         self.Show()
         self.image_panel.loadImage('test.jpg')
+
+    def onOpen(self, event):
+        with wx.FileDialog(self, "Open image", wildcard="JPEG, PNG and BMP files (*.jpg;*.png;*.bmp)|*.jpg;*.png;*.bmp", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return
+            try:
+                self.image_panel.loadImage(file_dialog.GetPath())
+            except:
+                print("ERROR: Cannot open file.")
+
+    def onSave(self, event):
+        with wx.FileDialog(self, "Save image", wildcard="JPEG, PNG and BMP files (*.jpg;*.png;*.bmp)|*.jpg;*.png;*.bmp", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return
+            try:
+                self.image_panel.saveImage(file_dialog.GetPath())
+            except:
+                print("ERROR: Cannot save file.")
+
+

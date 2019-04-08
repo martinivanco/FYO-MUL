@@ -83,7 +83,7 @@ class Render(threading.Thread):
             hsv[:,:,2] = hsv[:,:,2] + np.int16(self.gauss2d * self.vignette)
         
         if self.distort != 0:
-            self.distortion_coeffs[0,0] = self.distort * 2.0e-5
+            self.distortion_coeffs[0,0] = self.distort * 1.0e-5
             h, w, c = self.image.shape
             matrix, roi = cv2.getOptimalNewCameraMatrix(self.camera, self.distortion_coeffs, (w,h), 1, (w,h))
             bgr = cv2.cvtColor(np.uint8(hsv), cv2.COLOR_HSV2BGR_FULL)
@@ -125,7 +125,7 @@ class ImageProcessor():
     def loadImage(self, path):
         self.image = cv2.imread(path)
         height, width, channels = self.image.shape
-        g2d = cv2.getGaussianKernel(width, width / 2) * cv2.getGaussianKernel(height, height / 2).T
+        g2d = cv2.getGaussianKernel(height, height / 2) * cv2.getGaussianKernel(width, width / 2).T
         g2d = 1.0 / g2d
         g2d -= g2d.min()
         self.gauss2d = g2d / g2d.max()
