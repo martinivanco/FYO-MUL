@@ -12,13 +12,20 @@ class InfoPanel(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
         self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
 
         self.panel_sizer.Add(wx.Panel(self), 1, wx.EXPAND)
         self.red = wx.StaticText(self, label = "R:", size = (50, 20))
+        self.red.SetForegroundColour((255, 255, 255))
+        self.red.SetFont(font)
         self.panel_sizer.Add(self.red, 0)
         self.green = wx.StaticText(self, label = "G:", size = (50, 20))
+        self.green.SetForegroundColour((255, 255, 255))
+        self.green.SetFont(font)
         self.panel_sizer.Add(self.green, 0)
         self.blue = wx.StaticText(self, label = "B:", size = (50, 20))
+        self.blue.SetForegroundColour((255, 255, 255))
+        self.blue.SetFont(font)
         self.panel_sizer.Add(self.blue, 0)
         self.panel_sizer.Add(wx.Panel(self), 1, wx.EXPAND)
 
@@ -43,12 +50,17 @@ class SettingSlider(wx.Panel):
         self.image_processor = image_processor
         self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.factor = factor
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
     
-        self.label = wx.StaticText(self, label = tools.get_setting_name(self.setting), size = (70, 18))
+        self.label = wx.StaticText(self, label = tools.get_setting_name(self.setting), size = (80, 18))
+        self.label.SetFont(font)
+        self.label.SetForegroundColour((255, 255, 255))
         self.panel_sizer.Add(self.label, 0)
         self.slider = wx.Slider(self, value = default, minValue = lower_bound, maxValue = higher_bound)
         self.panel_sizer.Add(self.slider, 1, wx.LEFT | wx.RIGHT | wx.EXPAND, 5)
-        self.value = wx.StaticText(self, label = str(default * self.factor)[:3], size = (30, 15))
+        self.value = wx.StaticText(self, label = str(default * self.factor)[:3], size = (40, 15))
+        self.value.SetFont(font)
+        self.value.SetForegroundColour((255, 255, 255))
         self.panel_sizer.Add(self.value, 0)
 
         self.slider.Bind(wx.EVT_SCROLL, self.onScroll)
@@ -74,9 +86,13 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.figure.subplots_adjust(bottom=0.01, top=0.99, left=0.01, right=0.99)
         self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
         self.histogram.SetMinSize((1, 150))
+        self.figure.set_facecolor('#282828')
         self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
         self.info_panel = InfoPanel(self)
         self.panel_sizer.Add(self.info_panel, 0, wx.ALL | wx.EXPAND, 5)
+        line0 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        line0.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(line0, 0, wx.ALL | wx.EXPAND, 10)
 
         self.exposure = SettingSlider(self, tools.S_EXPOSURE, image_processor)
         self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
@@ -84,8 +100,14 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.panel_sizer.Add(self.contrast, 0, wx.ALL | wx.EXPAND, 5)
         self.saturation = SettingSlider(self, tools.S_SATURATION, image_processor)
         self.panel_sizer.Add(self.saturation, 0, wx.ALL | wx.EXPAND, 5)
+        line1 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        line1.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(line1, 0, wx.ALL | wx.EXPAND, 10)
 
         self.label_sharpen = wx.StaticText(self, label = "Sharpening")
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.label_sharpen.SetFont(font)
+        self.label_sharpen.SetForegroundColour((255, 255, 255))
         self.panel_sizer.Add(self.label_sharpen, 0, wx.ALL | wx.EXPAND, 5)
         self.sharpen_amount = SettingSlider(self, tools.S_SHARPEN_AMOUNT, image_processor, 0, 150)
         self.panel_sizer.Add(self.sharpen_amount, 0, wx.ALL | wx.EXPAND, 5)
@@ -95,6 +117,9 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.panel_sizer.Add(self.sharpen_masking, 0, wx.ALL | wx.EXPAND, 5)
         self.denoise = SettingSlider(self, tools.S_DENOISE, image_processor, 0)
         self.panel_sizer.Add(self.denoise, 0, wx.ALL | wx.EXPAND, 5)
+        line2 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        line2.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(line2, 0, wx.ALL | wx.EXPAND, 10)
 
         self.vignette = SettingSlider(self, tools.S_VIGNETTE, image_processor)
         self.panel_sizer.Add(self.vignette, 0, wx.ALL | wx.EXPAND, 5)
@@ -140,7 +165,7 @@ class ImagePanel(wx.Panel):
         self.img_w = self.image.GetWidth()
         self.img_h = self.image.GetHeight()
         self.image_processor.loadImage(path)
-        imgproc.Render(self.image_processor)
+        imgproc.Render(self.image_processor, True)
 
     def saveImage(self, path):
         self.image.SaveFile(path)
@@ -197,6 +222,7 @@ class MainFrame(wx.Frame):
         self.menu_bar.Append(file_menu, '&File')
         
         self.SetMenuBar(self.menu_bar)
+        self.main_panel.SetBackgroundColour((40, 40, 40))
         self.main_panel.SetSizer(self.panel_sizer)
         self.SetSize((900, 600))
         self.SetMinSize((900, 600))
