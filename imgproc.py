@@ -29,6 +29,27 @@ class Scale(threading.Thread):
     def sendResult(self, position, scaled_img):
         pub.sendMessage("scaled", position = position, scaled_image = scaled_img)
 
+class Equalize(threading.Thread):
+    def __init__(self, image_processor):
+        super(Equalize, self).__init__()
+        self.image = image_processor.full_image
+        self.start()
+
+    def run(self):
+        hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        equalized = cv2.equalizeHist(hsv[:,:,2])
+        hsv[:,:,2] = equalized
+        hist_exp = cv2.calcHist([hsv], [2], None, [256], (0,256))
+        final = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        hist_b = cv2.calcHist([final], [0], None, [256], (0,256))
+        hist_g = cv2.calcHist([final], [1], None, [256], (0,256))
+        hist_r = cv2.calcHist([final], [2], None, [256], (0,256))
+        wx.CallAfter(self.sendResult, final, (hist_b, hist_g, hist_r, hist_exp))
+
+    def sendResult(self, render, hist_data):
+        wx_image = wx.Bitmap.ConvertToImage(wx.Bitmap.FromBuffer(render.shape[1], render.shape[0], cv2.cvtColor(render, cv2.COLOR_BGR2RGB)))
+        pub.sendMessage("rendered", render = wx_image, hist_data = hist_data)
+
 class Render(threading.Thread):
     def __init__(self, image_processor, full_render = False):
         super(Render, self).__init__()

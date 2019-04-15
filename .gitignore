@@ -2,3 +2,4 @@
 playground.py
 test*.jpg
 __pycache__
+.vscode

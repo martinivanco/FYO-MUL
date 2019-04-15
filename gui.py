@@ -207,6 +207,7 @@ class MainFrame(wx.Frame):
         super().__init__(parent=None, title='Brightroom')
         self.main_panel = wx.Panel(self)
         self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.image_processor = image_processor
 
         self.image_panel = ImagePanel(self.main_panel, image_processor)
         self.panel_sizer.Add(self.image_panel, 2, wx.ALL | wx.EXPAND, 0)
@@ -220,6 +221,11 @@ class MainFrame(wx.Frame):
         item_save = file_menu.Append(wx.ID_SAVE, 'Save', 'Save the image')
         self.Bind(wx.EVT_MENU, self.onSave, item_save)
         self.menu_bar.Append(file_menu, '&File')
+
+        edit_menu = wx.Menu()
+        item_equalize = edit_menu.Append(wx.ID_DEFAULT, 'Equalize', 'Equalize histogram')
+        self.Bind(wx.EVT_MENU, self.onEqualize, item_equalize)
+        self.menu_bar.Append(edit_menu, '&Edit')
         
         self.SetMenuBar(self.menu_bar)
         self.main_panel.SetBackgroundColour((40, 40, 40))
@@ -247,4 +253,5 @@ class MainFrame(wx.Frame):
             except:
                 print("ERROR: Cannot save file.")
 
-
+    def onEqualize(self, event):
+        imgproc.Equalize(self.image_processor)
