@@ -71,7 +71,8 @@ class SettingSlider(wx.Panel):
         self.value.SetLabel(str(self.slider.GetValue() * self.factor)[:4 if self.slider.GetValue() < 0 else 3])
         self.image_processor.change(self.setting, self.slider.GetValue() * self.factor)
         imgproc.Render(self.image_processor)
-        event.Skip()
+        if event is not None:
+            event.Skip()
 
     def onRelease(self, event):
         imgproc.Render(self.image_processor, True)
@@ -142,6 +143,26 @@ class SettingsPanel(scroll.ScrolledPanel):
         tmp.fill_between(x, 0, hist_data[2][:,0], facecolor='#f44336')
         tmp.fill_between(x, 0, hist_data[3][:,0], facecolor='#9e9e9e')
         self.histogram.draw()
+
+    def resetSettings(self):
+        self.exposure.slider.SetValue(0)
+        self.exposure.onScroll(None)
+        self.contrast.slider.SetValue(0)
+        self.contrast.onScroll(None)
+        self.saturation.slider.SetValue(0)
+        self.saturation.onScroll(None)
+        self.sharpen_amount.slider.SetValue(0)
+        self.sharpen_amount.onScroll(None)
+        self.sharpen_radius.slider.SetValue(10)
+        self.sharpen_radius.onScroll(None)
+        self.sharpen_masking.slider.SetValue(0)
+        self.sharpen_masking.onScroll(None)
+        self.denoise.slider.SetValue(0)
+        self.denoise.onScroll(None)
+        self.vignette.slider.SetValue(0)
+        self.vignette.onScroll(None)
+        self.distort.slider.SetValue(0)
+        self.distort.onScroll(None)
 
 class ImagePanel(wx.Panel):
     def __init__(self, parent, image_processor):
@@ -233,13 +254,13 @@ class MainFrame(wx.Frame):
         self.SetSize((900, 600))
         self.SetMinSize((900, 600))
         self.Show()
-        self.image_panel.loadImage('test.jpg')
 
     def onOpen(self, event):
         with wx.FileDialog(self, "Open image", wildcard="JPEG, PNG and BMP files (*.jpg;*.png;*.bmp)|*.jpg;*.png;*.bmp", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file_dialog:
             if file_dialog.ShowModal() == wx.ID_CANCEL:
                 return
             try:
+                self.settings_panel.resetSettings()
                 self.image_panel.loadImage(file_dialog.GetPath())
             except:
                 print("ERROR: Cannot open file.")

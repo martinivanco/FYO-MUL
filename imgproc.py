@@ -53,6 +53,8 @@ class Equalize(threading.Thread):
 class Render(threading.Thread):
     def __init__(self, image_processor, full_render = False):
         super(Render, self).__init__()
+        if image_processor.full_image is None:
+            return
         self.full_image = image_processor.full_image
         self.full_gauss2d = image_processor.full_gauss2d
         self.full_camera = image_processor.full_camera

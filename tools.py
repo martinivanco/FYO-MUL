@@ -28,6 +28,14 @@ def get_setting_name(setting):
         return "Temp"
     if setting & S_TINT:
         return "Tint"
+    if setting & S_HIGHLIGHTS:
+        return "Highlights"
+    if setting & S_SHADOWS:
+        return "Shadows"
+    if setting & S_WHITES:
+        return "Whites"
+    if setting & S_BLACKS:
+        return "Blacks"
     if setting & S_SHARPEN_AMOUNT:
         return "Amount"
     if setting & S_SHARPEN_RADIUS:
