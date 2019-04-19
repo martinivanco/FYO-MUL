@@ -1,5 +1,6 @@
 import tools
 import imgproc
+import videoproc
 import wx
 import wx.lib.scrolledpanel as scroll
 import wx.media
@@ -8,6 +9,30 @@ import matplotlib as mpl
 import matplotlib.backends.backend_wxagg as wxagg
 from matplotlib.figure import Figure
 import numpy as np
+import ffprobe3
+import re
+import os
+
+class InfoLabel(wx.Panel):
+    def __init__(self, parent, name, value = ""):
+        super().__init__(parent)
+        self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+
+        self.label = wx.StaticText(self, label = name, size = (110, 20))
+        self.label.SetForegroundColour((255, 255, 255))
+        self.label.SetFont(font)
+        self.panel_sizer.Add(self.label, 0)
+
+        self.value = wx.StaticText(self, label = str(value))
+        self.value.SetForegroundColour((255, 255, 255))
+        self.value.SetFont(font)
+        self.panel_sizer.Add(self.value, 1, wx.LEFT | wx.EXPAND, 5)
+
+        self.SetSizer(self.panel_sizer)
+
+    def setValue(self, value):
+        self.value.SetLabelText(str(value))
 
 class InfoPanel(wx.Panel):
     def __init__(self, parent):
@@ -79,17 +104,83 @@ class SettingSlider(wx.Panel):
         imgproc.Render(self.image_processor, True)
         event.Skip()
 
+class TimePanel(wx.Panel):
+    def __init__(self, parent, name, video):
+        super().__init__(parent)
+        self.video = video
+        self.time = 0.0
+        self.panel_sizer = wx.BoxSizer(wx.VERTICAL)
+        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+
+        self.label = wx.StaticText(self, label = name)
+        self.label.SetForegroundColour((255, 255, 255))
+        self.label.SetFont(font)
+        self.panel_sizer.Add(self.label, 0, wx.BOTTOM | wx.EXPAND, 5)
+
+        self.input = wx.TextCtrl(self, value = "00:00:00.00")
+        self.panel_sizer.Add(self.input, 0, wx.BOTTOM | wx.EXPAND, 5)
+
+        self.button = wx.Button(self, label = "Set Current")
+        self.panel_sizer.Add(self.button, 0, wx.LEFT | wx.RIGHT | wx.EXPAND, 25)
+
+        self.input.Bind(wx.EVT_KILL_FOCUS, self.onSetTime)
+        self.button.Bind(wx.EVT_BUTTON, self.onPress)
+        self.SetSizer(self.panel_sizer)
+
+    def onSetTime(self, event):
+        f = re.compile("..:..:..{}..".format(re.escape(".")))
+        if f.match(self.input.GetValue()) is None:
+            self.time = 0.0
+            self.input.SetValue("00:00:00.00")
+        if event is not None:
+            event.Skip()
+
+    def onPress(self, event):
+        self.time = self.video.getCurrentTime()
+        f = "%02d" % round((self.time % 1) * 100)
+        s = "%02d" % round(self.time % 60)
+        m = "%02d" % round(self.time % 3600 // 60)
+        h = round(self.time // 3600)
+        h = "99" if h > 99 else "%02d" % h
+        self.input.SetValue("{}:{}:{}.{}".format(h, m, s, f))
+        if event is not None:
+            event.Skip()
+
+class EditPanel(wx.Panel):
+    def __init__(self, parent, video_length):
+        super().__init__(parent)
+        self.video_length = video_length
+        self.panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.begin = TimePanel(self, "From:", parent.image_panel)
+        self.panel_sizer.Add(self.begin, 1, wx.RIGHT, 10)
+        self.end = TimePanel(self, "To:", parent.image_panel)
+        self.panel_sizer.Add(self.end, 1)
+
+        self.SetSizer(self.panel_sizer)
+
+    def getCutTimes(self):
+        if self.begin.time < self.end.time: # TODO check video length
+            return (self.begin.time, self.end.time)
+        else:
+            return None #TODO show dialog
+
+
 class SettingsPanel(scroll.ScrolledPanel):
-    def __init__(self, parent, image_processor):
+    def __init__(self, parent, image_processor, image_panel):
         super().__init__(parent)
         self.video_mode = False
+        self.video_path = None
+        self.video_orig = True
         self.image_processor = image_processor
+        self.image_panel = image_panel
         self.panel_sizer = wx.BoxSizer(wx.VERTICAL)
         self.font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
         self.photoSetup()
         self.SetSizer(self.panel_sizer)
         self.SetupScrolling()
         pub.subscribe(self.onHistogram, "rendered")
+        pub.subscribe(self.onVideo, "tmp_video")
 
     def onHistogram(self, render, hist_data = None):
         if hist_data is None:
@@ -170,14 +261,72 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.distort = SettingSlider(self, tools.S_DISTORT, self.image_processor)
         self.panel_sizer.Add(self.distort, 0, wx.ALL | wx.EXPAND, 5)
 
-    def videoSetup(self):
-        return #TODO
+    def videoSetup(self, video_path):
+        self.video_path = video_path
+        self.label_info = wx.StaticText(self, label = "Video properties:")
+        self.label_info.SetFont(self.font)
+        self.label_info.SetForegroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.label_info, 0, wx.ALL | wx.EXPAND, 5)
 
-    def setMode(self, mode):
+        metadata = ffprobe3.FFProbe(video_path)
+        audio_stream = None
+        video_stream = None
+        for stream in metadata.streams:
+            if stream.is_video():
+                video_stream = stream
+            if stream.is_audio():
+                audio_stream = stream
+
+        if video_stream is None:
+            return
+        self.resolution = InfoLabel(self, "Resolution:", video_stream.__dict__["width"] + "x" + video_stream.__dict__["height"])
+        self.panel_sizer.Add(self.resolution, 0, wx.ALL | wx.EXPAND, 5)
+        self.length = InfoLabel(self, "Length:", video_stream.__dict__["duration"] + " s")
+        self.panel_sizer.Add(self.length, 0, wx.ALL | wx.EXPAND, 5)
+        self.fps = InfoLabel(self, "Frame rate:", video_stream.__dict__["r_frame_rate"].split("/")[0] + " fps")
+        self.panel_sizer.Add(self.fps, 0, wx.ALL | wx.EXPAND, 5)
+        self.video_codec = InfoLabel(self, "Video codec:", video_stream.codec())
+        self.panel_sizer.Add(self.video_codec, 0, wx.ALL | wx.EXPAND, 5)
+        self.video_bitrate = InfoLabel(self, "Video bitrate:", video_stream.__dict__["bit_rate"] + " bps")
+        self.panel_sizer.Add(self.video_bitrate, 0, wx.ALL | wx.EXPAND, 5)
+        if audio_stream is None:
+            return
+        self.audio_codec = InfoLabel(self, "Audio codec:", audio_stream.codec())
+        self.panel_sizer.Add(self.audio_codec, 0, wx.ALL | wx.EXPAND, 5)
+        self.audio_bitrate = InfoLabel(self, "Audio bitrate:", audio_stream.__dict__["bit_rate"] + " bps")
+        self.panel_sizer.Add(self.audio_bitrate, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.line0 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        self.line0.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.line0, 0, wx.ALL | wx.EXPAND, 10)
+        self.label_cut = wx.StaticText(self, label = "Cut section:")
+        self.label_cut.SetFont(self.font)
+        self.label_cut.SetForegroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.label_cut, 0, wx.ALL | wx.EXPAND, 5)
+        self.edit_panel = EditPanel(self, float(video_stream.__dict__["duration"]))
+        self.panel_sizer.Add(self.edit_panel, 0, wx.ALL | wx.EXPAND, 5)
+        self.button = wx.Button(self, label = "Render")
+        self.panel_sizer.Add(self.button, 0, wx.ALL | wx.EXPAND, 30)
+        self.button.Bind(wx.EVT_BUTTON, self.onButton)
+        
+    def setMode(self, mode, video_path = None):
         if not self.video_mode and not mode:
             self.resetSettings()
             return
         if self.video_mode and not mode:
+            self.button.Unbind(wx.EVT_BUTTON)
+            self.button.Destroy()
+            self.edit_panel.Destroy()
+            self.label_cut.Destroy()
+            self.line0.Destroy()
+            self.audio_bitrate.Destroy()
+            self.audio_codec.Destroy()
+            self.video_bitrate.Destroy()
+            self.video_codec.Destroy()
+            self.fps.Destroy()
+            self.length.Destroy()
+            self.resolution.Destroy()
+            self.info_title.Destroy()
             self.photoSetup()
             self.panel_sizer.Layout()
             self.video_mode = mode
@@ -198,10 +347,30 @@ class SettingsPanel(scroll.ScrolledPanel):
             self.line0.Destroy()
             self.info_panel.Destroy()
             self.histogram.Destroy()
-            self.videoSetup()
+            self.videoSetup(video_path)
             self.panel_sizer.Layout()
             self.video_mode = mode
             return
+
+    def onButton(self, event):
+        if self.video_orig:
+            cut_times = self.edit_panel.getCutTimes()
+            if cut_times is not None:
+                self.button.Disable()
+                self.button.SetLabel("Rendering...")
+                videoproc.VideoRender(self.video_path, cut_times)
+        else:
+            self.image_panel.loadVideo(self.video_path)
+            self.video_orig = True
+            self.button.SetLabel("Render")
+        if event is not None:
+            event.Skip()
+
+    def onVideo(self):
+        self.image_panel.loadVideo(os.path.join(os.getcwd(), "_tmp.mp4"))
+        self.video_orig = False
+        self.button.SetLabel("Show original")
+        self.button.Enable()
 
 class ImagePanel(wx.Panel):
     def __init__(self, parent, image_processor):
@@ -253,6 +422,11 @@ class ImagePanel(wx.Panel):
 
     def saveImage(self, path):
         self.image.SaveFile(path)
+
+    def getCurrentTime(self):
+        if not self.video_mode:
+            return None
+        return round(self.widget.Tell() / 10) / 100.0
 
     def onResize(self, event):
         if self.video_mode:
@@ -310,7 +484,7 @@ class MainFrame(wx.Frame):
 
         self.image_panel = ImagePanel(self.main_panel, image_processor)
         self.panel_sizer.Add(self.image_panel, 2, wx.ALL | wx.EXPAND, 0)
-        self.settings_panel = SettingsPanel(self.main_panel, image_processor)
+        self.settings_panel = SettingsPanel(self.main_panel, image_processor, self.image_panel)
         self.panel_sizer.Add(self.settings_panel, 1, wx.ALL | wx.EXPAND, 0)
 
         self.menu_bar = wx.MenuBar()
@@ -340,7 +514,7 @@ class MainFrame(wx.Frame):
             try:
                 fps = file_dialog.GetPath().split('.')
                 video = fps[len(fps) - 1] == "mp4"
-                self.settings_panel.setMode(video)
+                self.settings_panel.setMode(video, file_dialog.GetPath())
                 if video:
                     self.image_panel.loadVideo(file_dialog.GetPath())
                 else:
@@ -358,4 +532,7 @@ class MainFrame(wx.Frame):
                 print("ERROR: Cannot save file.")
 
     def onEqualize(self, event):
-        imgproc.Equalize(self.image_processor)
+        if self.image_panel.video_mode:
+            pass # TODO show dialog
+        else:
+            imgproc.Equalize(self.image_processor)
