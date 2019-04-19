@@ -82,52 +82,11 @@ class SettingSlider(wx.Panel):
 class SettingsPanel(scroll.ScrolledPanel):
     def __init__(self, parent, image_processor):
         super().__init__(parent)
+        self.video_mode = False
+        self.image_processor = image_processor
         self.panel_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        self.figure = Figure()
-        self.figure.subplots_adjust(bottom=0.01, top=0.99, left=0.01, right=0.99)
-        self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
-        self.histogram.SetMinSize((1, 150))
-        self.figure.set_facecolor('#282828')
-        self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
-        self.info_panel = InfoPanel(self)
-        self.panel_sizer.Add(self.info_panel, 0, wx.ALL | wx.EXPAND, 5)
-        line0 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
-        line0.SetBackgroundColour((255, 255, 255))
-        self.panel_sizer.Add(line0, 0, wx.ALL | wx.EXPAND, 10)
-
-        self.exposure = SettingSlider(self, tools.S_EXPOSURE, image_processor)
-        self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
-        self.contrast = SettingSlider(self, tools.S_CONTRAST, image_processor)
-        self.panel_sizer.Add(self.contrast, 0, wx.ALL | wx.EXPAND, 5)
-        self.saturation = SettingSlider(self, tools.S_SATURATION, image_processor)
-        self.panel_sizer.Add(self.saturation, 0, wx.ALL | wx.EXPAND, 5)
-        line1 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
-        line1.SetBackgroundColour((255, 255, 255))
-        self.panel_sizer.Add(line1, 0, wx.ALL | wx.EXPAND, 10)
-
-        self.label_sharpen = wx.StaticText(self, label = "Sharpening")
-        font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
-        self.label_sharpen.SetFont(font)
-        self.label_sharpen.SetForegroundColour((255, 255, 255))
-        self.panel_sizer.Add(self.label_sharpen, 0, wx.ALL | wx.EXPAND, 5)
-        self.sharpen_amount = SettingSlider(self, tools.S_SHARPEN_AMOUNT, image_processor, 0, 150)
-        self.panel_sizer.Add(self.sharpen_amount, 0, wx.ALL | wx.EXPAND, 5)
-        self.sharpen_radius = SettingSlider(self, tools.S_SHARPEN_RADIUS, image_processor, 5, 30, 10, 0.1)
-        self.panel_sizer.Add(self.sharpen_radius, 0, wx.ALL | wx.EXPAND, 5)
-        self.sharpen_masking = SettingSlider(self, tools.S_SHARPEN_MASKING, image_processor, 0)
-        self.panel_sizer.Add(self.sharpen_masking, 0, wx.ALL | wx.EXPAND, 5)
-        self.denoise = SettingSlider(self, tools.S_DENOISE, image_processor, 0)
-        self.panel_sizer.Add(self.denoise, 0, wx.ALL | wx.EXPAND, 5)
-        line2 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
-        line2.SetBackgroundColour((255, 255, 255))
-        self.panel_sizer.Add(line2, 0, wx.ALL | wx.EXPAND, 10)
-
-        self.vignette = SettingSlider(self, tools.S_VIGNETTE, image_processor)
-        self.panel_sizer.Add(self.vignette, 0, wx.ALL | wx.EXPAND, 5)
-        self.distort = SettingSlider(self, tools.S_DISTORT, image_processor)
-        self.panel_sizer.Add(self.distort, 0, wx.ALL | wx.EXPAND, 5)
-
+        self.font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.photoSetup()
         self.SetSizer(self.panel_sizer)
         self.SetupScrolling()
         pub.subscribe(self.onHistogram, "rendered")
@@ -166,6 +125,83 @@ class SettingsPanel(scroll.ScrolledPanel):
         self.vignette.onScroll(None)
         self.distort.slider.SetValue(0)
         self.distort.onScroll(None)
+
+    def photoSetup(self):
+        self.figure = Figure()
+        self.figure.subplots_adjust(bottom=0.01, top=0.99, left=0.01, right=0.99)
+        self.histogram = wxagg.FigureCanvasWxAgg(self, -1, self.figure)
+        self.histogram.SetMinSize((1, 150))
+        self.figure.set_facecolor('#282828')
+        self.panel_sizer.Add(self.histogram, 0, wx.ALL | wx.EXPAND, 5)
+        self.info_panel = InfoPanel(self)
+        self.panel_sizer.Add(self.info_panel, 0, wx.ALL | wx.EXPAND, 5)
+        self.line0 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        self.line0.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.line0, 0, wx.ALL | wx.EXPAND, 10)
+
+        self.exposure = SettingSlider(self, tools.S_EXPOSURE, self.image_processor)
+        self.panel_sizer.Add(self.exposure, 0, wx.ALL | wx.EXPAND, 5)
+        self.contrast = SettingSlider(self, tools.S_CONTRAST, self.image_processor)
+        self.panel_sizer.Add(self.contrast, 0, wx.ALL | wx.EXPAND, 5)
+        self.saturation = SettingSlider(self, tools.S_SATURATION, self.image_processor)
+        self.panel_sizer.Add(self.saturation, 0, wx.ALL | wx.EXPAND, 5)
+        self.line1 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        self.line1.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.line1, 0, wx.ALL | wx.EXPAND, 10)
+
+        self.label_sharpen = wx.StaticText(self, label = "Sharpening")
+        self.label_sharpen.SetFont(self.font)
+        self.label_sharpen.SetForegroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.label_sharpen, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpen_amount = SettingSlider(self, tools.S_SHARPEN_AMOUNT, self.image_processor, 0, 150)
+        self.panel_sizer.Add(self.sharpen_amount, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpen_radius = SettingSlider(self, tools.S_SHARPEN_RADIUS, self.image_processor, 5, 30, 10, 0.1)
+        self.panel_sizer.Add(self.sharpen_radius, 0, wx.ALL | wx.EXPAND, 5)
+        self.sharpen_masking = SettingSlider(self, tools.S_SHARPEN_MASKING, self.image_processor, 0)
+        self.panel_sizer.Add(self.sharpen_masking, 0, wx.ALL | wx.EXPAND, 5)
+        self.denoise = SettingSlider(self, tools.S_DENOISE, self.image_processor, 0)
+        self.panel_sizer.Add(self.denoise, 0, wx.ALL | wx.EXPAND, 5)
+        self.line2 = wx.StaticLine(self, -1, style = wx.LI_HORIZONTAL)
+        self.line2.SetBackgroundColour((255, 255, 255))
+        self.panel_sizer.Add(self.line2, 0, wx.ALL | wx.EXPAND, 10)
+
+        self.vignette = SettingSlider(self, tools.S_VIGNETTE, self.image_processor)
+        self.panel_sizer.Add(self.vignette, 0, wx.ALL | wx.EXPAND, 5)
+        self.distort = SettingSlider(self, tools.S_DISTORT, self.image_processor)
+        self.panel_sizer.Add(self.distort, 0, wx.ALL | wx.EXPAND, 5)
+
+    def videoSetup(self):
+        return #TODO
+
+    def setMode(self, mode):
+        if not self.video_mode and not mode:
+            self.resetSettings()
+            return
+        if self.video_mode and not mode:
+            self.photoSetup()
+            self.panel_sizer.Layout()
+            self.video_mode = mode
+            return
+        if not self.video_mode and mode:
+            self.distort.Destroy()
+            self.vignette.Destroy()
+            self.line2.Destroy()
+            self.denoise.Destroy()
+            self.sharpen_masking.Destroy()
+            self.sharpen_radius.Destroy()
+            self.sharpen_amount.Destroy()
+            self.label_sharpen.Destroy()
+            self.line1.Destroy()
+            self.saturation.Destroy()
+            self.contrast.Destroy()
+            self.exposure.Destroy()
+            self.line0.Destroy()
+            self.info_panel.Destroy()
+            self.histogram.Destroy()
+            self.videoSetup()
+            self.panel_sizer.Layout()
+            self.video_mode = mode
+            return
 
 class ImagePanel(wx.Panel):
     def __init__(self, parent, image_processor):
@@ -304,7 +340,7 @@ class MainFrame(wx.Frame):
             try:
                 fps = file_dialog.GetPath().split('.')
                 video = fps[len(fps) - 1] == "mp4"
-                self.settings_panel.resetSettings()
+                self.settings_panel.setMode(video)
                 if video:
                     self.image_panel.loadVideo(file_dialog.GetPath())
                 else:
