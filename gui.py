@@ -365,7 +365,7 @@ class SettingsPanel(scroll.ScrolledPanel):
             if cut_times is not None:
                 self.button.Disable()
                 self.button.SetLabel("Rendering...")
-                videoproc.VideoRender(self.video_path, cut_times)
+                videoproc.VideoCut(self.video_path, cut_times)
         else:
             self.image_panel.loadVideo(self.video_path)
             self.video_orig = True
@@ -506,13 +506,16 @@ class MainFrame(wx.Frame):
         self.menu_bar.Append(file_menu, '&File')
 
         edit_menu = wx.Menu()
-        item_equalize = edit_menu.Append(wx.ID_DEFAULT, 'Equalize', 'Equalize histogram')
+        item_equalize = edit_menu.Append(1, 'Equalize', 'Equalize histogram')
         self.Bind(wx.EVT_MENU, self.onEqualize, item_equalize)
+        self.item_merge = edit_menu.Append(2, 'Merge', 'Merge two videos')
+        self.Bind(wx.EVT_MENU, self.onMerge, self.item_merge)
         self.menu_bar.Append(edit_menu, '&Edit')
         
         self.SetMenuBar(self.menu_bar)
         self.main_panel.SetBackgroundColour((40, 40, 40))
         self.main_panel.SetSizer(self.panel_sizer)
+        pub.subscribe(self.onMergeFinished, "merged")
         self.SetSize((900, 600))
         self.SetMinSize((900, 600))
         self.Show()
@@ -553,3 +556,33 @@ class MainFrame(wx.Frame):
             wx.MessageBox('Sorry, equalizing histogram is only avaliabe for photos.', 'Information', wx.OK | wx.ICON_INFORMATION)
         else:
             imgproc.Equalize(self.image_processor)
+
+    def onMerge(self, event):
+        if self.image_panel.video_mode:
+            path1 = None
+            path2 = None
+            save_path = None
+            with wx.FileDialog(self, "Choose first video", wildcard="MP4 files (*.mp4)|*.mp4", style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST) as file_dialog:
+                if file_dialog.ShowModal() == wx.ID_CANCEL:
+                    return
+                path1 = file_dialog.GetPath()
+            with wx.FileDialog(self, "Choose second video", wildcard="MP4 files (*.mp4)|*.mp4", style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST) as file_dialog:
+                if file_dialog.ShowModal() == wx.ID_CANCEL:
+                    return
+                path2 = file_dialog.GetPath()
+            with wx.FileDialog(self, "Save merged video as", wildcard="MP4 files (*.mp4)|*.mp4", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
+                if file_dialog.ShowModal() == wx.ID_CANCEL:
+                    return
+                save_path = file_dialog.GetPath()
+            self.item_merge.Enable(False)
+            videoproc.VideoMerge(path1, path2, save_path)
+            wx.MessageBox('Merging videos in background. You can continue working, we\'ll inform you when it\'s finished.', 'Information', wx.OK | wx.ICON_INFORMATION)
+        else:
+            wx.MessageBox('Sorry, merging is only available for videos.', 'Information', wx.OK | wx.ICON_INFORMATION)
+
+    def onMergeFinished(self, status, message = None):
+        if status:
+            wx.MessageBox('Merging videos finished.', 'Information', wx.OK | wx.ICON_INFORMATION)
+        else:
+            wx.MessageBox('Merging videos failed:\n' + message, 'Error', wx.OK | wx.ICON_ERROR)
+        self.item_merge.Enable(True)

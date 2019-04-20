@@ -32,6 +32,8 @@ class Scale(threading.Thread):
 class Equalize(threading.Thread):
     def __init__(self, image_processor):
         super(Equalize, self).__init__()
+        if image_processor.full_image is None:
+            return
         self.image = image_processor.full_image
         self.start()
 
