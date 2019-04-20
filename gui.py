@@ -12,6 +12,7 @@ import numpy as np
 import ffprobe3
 import re
 import os
+import shutil as sh
 
 class InfoLabel(wx.Panel):
     def __init__(self, parent, name, value = ""):
@@ -128,10 +129,13 @@ class TimePanel(wx.Panel):
         self.SetSizer(self.panel_sizer)
 
     def onSetTime(self, event):
-        f = re.compile("..:..:..{}..".format(re.escape(".")))
+        f = re.compile("[0-9][0-9]:[0-9][0-9]:[0-9][0-9]{}[0-9][0-9]".format(re.escape(".")))
         if f.match(self.input.GetValue()) is None:
             self.time = 0.0
             self.input.SetValue("00:00:00.00")
+        else:
+            p = self.input.GetValue().split(":")
+            self.time = 3600 * int(p[0]) + 60 * int(p[1]) + float(p[2])
         if event is not None:
             event.Skip()
 
@@ -160,11 +164,14 @@ class EditPanel(wx.Panel):
         self.SetSizer(self.panel_sizer)
 
     def getCutTimes(self):
-        if self.begin.time < self.end.time: # TODO check video length
-            return (self.begin.time, self.end.time)
-        else:
-            return None #TODO show dialog
+        if self.begin.time >= self.video_length or self.end.time >= self.video_length:
+            wx.MessageBox('Cut times must be in range of length of the video.', 'Warning', wx.OK | wx.ICON_WARNING)
+            return None
+        if self.begin.time >= self.end.time:
+            wx.MessageBox('Begin time must be smaller than end time.', 'Warning', wx.OK | wx.ICON_WARNING)
+            return None
 
+        return (self.begin.time, self.end.time)
 
 class SettingsPanel(scroll.ScrolledPanel):
     def __init__(self, parent, image_processor, image_panel):
@@ -326,7 +333,7 @@ class SettingsPanel(scroll.ScrolledPanel):
             self.fps.Destroy()
             self.length.Destroy()
             self.resolution.Destroy()
-            self.info_title.Destroy()
+            self.label_info.Destroy()
             self.photoSetup()
             self.panel_sizer.Layout()
             self.video_mode = mode
@@ -422,6 +429,9 @@ class ImagePanel(wx.Panel):
 
     def saveImage(self, path):
         self.image.SaveFile(path)
+
+    def saveVideo(self, path):
+        sh.copy(os.path.join(os.getcwd(), "_tmp.mp4"), path)
 
     def getCurrentTime(self):
         if not self.video_mode:
@@ -523,16 +533,23 @@ class MainFrame(wx.Frame):
                 print("ERROR: Cannot open file.")
 
     def onSave(self, event):
-        with wx.FileDialog(self, "Save file", wildcard="JPEG, PNG, BMP and MP4 files (*.jpg;*.png;*.bmp;*.mp4)|*.jpg;*.png;*.bmp;*.mp4", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
+        with wx.FileDialog(self, "Save file", wildcard="JPEG, PNG, BMP or MP4 files (*.jpg;*.png;*.bmp;*.mp4)|*.jpg;*.png;*.bmp;*.mp4", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
             if file_dialog.ShowModal() == wx.ID_CANCEL:
                 return
+            ffs = file_dialog.GetPath().split('.')
+            if self.image_panel.video_mode and ffs[len(ffs) - 1] != "mp4":
+                wx.MessageBox('Sorry, videos can only be saved as mp4. Please try again.', 'Information', wx.OK | wx.ICON_INFORMATION)
+                return
             try:
-                self.image_panel.saveImage(file_dialog.GetPath())
+                if self.image_panel.video_mode:
+                    self.image_panel.saveVideo(file_dialog.GetPath())
+                else:
+                    self.image_panel.saveImage(file_dialog.GetPath())
             except:
                 print("ERROR: Cannot save file.")
 
     def onEqualize(self, event):
         if self.image_panel.video_mode:
-            pass # TODO show dialog
+            wx.MessageBox('Sorry, equalizing histogram is only avaliabe for photos.', 'Information', wx.OK | wx.ICON_INFORMATION)
         else:
             imgproc.Equalize(self.image_processor)
