@@ -2,7 +2,7 @@
 Project made as a part of the courses Physical Optics and Multimedia at Brno University of Technology. The task was to create a digital photography image processing application.
 
 ## How to use
-1. Clone this repo using `git clone https://github.com/photohunter9/PDS.git`
+1. Clone this repo using `git clone https://github.com/photohunter9/FYO-MUL.git`
 2. Run the app using `python3 app.py`
 3. ???
 4. Profit!
